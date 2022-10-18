@@ -1,23 +1,58 @@
+const TicketControl = require('../models/ticket-control');
 
+const ticketControl = new TicketControl();
 
 const socketController = (socket) => {
+
+    // cuando un cliente se conecta
+    socket.emit('ultimo-ticket', ticketControl.ultimo);
+    socket.emit( 'estado-actual', ticketControl.ultimos4 );
+    socket.emit('tickets-pendientes', ticketControl.tickets.length);
     
-    console.log('cliente conectado', socket.id);
 
-    socket.on('disconnect', () => {
-        console.log('Cliente desconectado', socket.id);
-    });
+    socket.on('siguiente-ticket', (payload , callback ) => {
 
-    socket.on('enviar-mensaje', (payload , callback ) => {
+        const siguiente = ticketControl.siguiente();
 
-        const id = 123456;
+        callback( siguiente );
 
-        callback(id)
+        socket.broadcast.emit('tickets-pendientes', ticketControl.tickets.length);
 
-        socket.broadcast.emit('enviar-mensaje', payload)
 
+    })
+
+    socket.on('atender-ticket', ({escritorio}, callback) => {
+
+        if( !escritorio ) {
+            return callback({
+                ok: false,
+                msg: 'El escritorio es obligatorio'
+            })
+        }
+      
+        const ticket = ticketControl.atenderTicket( escritorio );
+
+        socket.broadcast.emit( 'estado-actual', ticketControl.ultimos4 );
+        socket.emit('tickets-pendientes', ticketControl.tickets.length);
+        socket.broadcast.emit('tickets-pendientes', ticketControl.tickets.length);
+
+
+        if( !ticket ) {
+            callback({
+                ok: false,
+                msg: 'Ya no hay ticket pendientes'
+            })
+        } else {
+            callback({
+                ok: true, 
+                ticket
+            })
+        }
+        
     })
     
 }
 
-module.exports = socketController;
+module.exports = {
+    socketController
+};
